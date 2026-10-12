@@ -1,0 +1,1495 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<title>🎁 Апгрейдер подарков</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: radial-gradient(circle at 20% 0%, #2a1a4a 0%, #14122b 45%, #0a0a18 100%);
+    color:#eaeaea; min-height:100vh;
+    display:flex; flex-direction:column; align-items:center;
+    padding-bottom:40px;
+  }
+  header { text-align:center; padding:28px 16px 6px; }
+  header h1 {
+    font-size:2.1rem;
+    background:linear-gradient(90deg,#a06bff,#ff6bcb,#ffb86b);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  header p { color:#8f93b8; margin-top:6px; font-size:.95rem; }
+
+  .wallet {
+    margin:18px 0 6px;
+    background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.08);
+    padding:10px 22px; border-radius:14px;
+    font-size:1.05rem; font-weight:600;
+    display:flex; gap:8px; align-items:center;
+  }
+  .wallet span { color:#ffd76b; }
+
+  main { width:100%; max-width:900px; padding:0 16px; }
+
+  .panel {
+    background:rgba(255,255,255,.045);
+    border:1px solid rgba(255,255,255,.07);
+    border-radius:20px;
+    padding:22px;
+    margin-bottom:18px;
+  }
+  .panel h2 {
+    font-size:1.15rem; margin-bottom:14px;
+    display:flex; align-items:center; gap:8px;
+    color:#d6c9ff;
+  }
+
+  .inventory {
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(120px,1fr));
+    gap:12px;
+  }
+  .gift {
+    position:relative;
+    background:linear-gradient(160deg,#241d47,#1a1733);
+    border:2px solid transparent;
+    border-radius:16px;
+    padding:12px 8px;
+    text-align:center;
+    cursor:pointer;
+    transition:.18s;
+    user-select:none;
+  }
+  .gift:hover { transform:translateY(-3px); border-color:#7a5cff; }
+  .gift.selected {
+    border-color:#ffd76b;
+    box-shadow:0 0 0 2px rgba(255,215,107,.35), 0 8px 24px rgba(255,215,107,.2);
+  }
+  .gift .emoji { font-size:2.3rem; display:block; margin-bottom:6px; }
+  .gift .name { font-size:.85rem; font-weight:600; }
+  .gift .price { font-size:.8rem; color:#ffd76b; margin-top:3px; }
+  .gift .rarity {
+    position:absolute; top:6px; right:8px;
+    font-size:.65rem; padding:2px 7px; border-radius:8px;
+    font-weight:700; letter-spacing:.5px;
+  }
+  .r-common   { background:#4a5568; color:#cbd5e0; }
+  .r-rare     { background:#2b6cb0; color:#bee3f8; }
+  .r-epic     { background:#6b46c1; color:#e9d8fd; }
+  .r-legend   { background:linear-gradient(90deg,#f6ad55,#f6e05e); color:#1a1a1a; }
+  .r-super {
+    background:linear-gradient(90deg,#ff5f8f,#ffd76b,#68d391,#5fb8ff,#c86bff);
+    color:#14122b; animation:superglow 2s linear infinite;
+    background-size:300% 100%;
+  }
+  @keyframes superglow { 0%{background-position:0% 0} 100%{background-position:300% 0} }
+
+
+  /* ---------- МАГАЗИН ---------- */
+  .shop-controls {
+    display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;
+    align-items:center;
+  }
+  .shop-filter {
+    padding:7px 14px; border-radius:10px; cursor:pointer;
+    background:rgba(255,255,255,.07); color:#cdd6e4;
+    font-size:.82rem; font-weight:600; border:1px solid transparent;
+    transition:.15s; user-select:none;
+  }
+  .shop-filter:hover { background:rgba(255,255,255,.13); }
+  .shop-filter.active {
+    background:linear-gradient(90deg,#7a5cff,#ff6bcb);
+    color:#fff;
+  }
+  #shop-search {
+    flex:1; min-width:130px;
+    padding:8px 14px; border-radius:10px;
+    background:rgba(0,0,0,.3);
+    border:1px solid rgba(255,255,255,.12);
+    color:#eaeaea; font-size:.88rem; outline:none;
+  }
+  #shop-search::placeholder { color:#666c8a; }
+  #shop-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(125px,1fr));
+    gap:12px;
+    max-height:340px;
+    overflow-y:auto;
+    padding-right:4px;
+  }
+  .shop-item {
+    position:relative;
+    background:linear-gradient(160deg,#241d47,#1a1733);
+    border:2px solid transparent;
+    border-radius:16px;
+    padding:12px 8px;
+    text-align:center;
+    transition:.18s;
+    user-select:none;
+  }
+  .shop-item .emoji { font-size:2.2rem; display:block; margin-bottom:6px; }
+  .shop-item .name { font-size:.82rem; font-weight:600; margin-bottom:2px; }
+  .shop-item .rarity {
+    position:absolute; top:6px; right:8px;
+    font-size:.62rem; padding:2px 6px; border-radius:8px;
+    font-weight:700;
+  }
+  .shop-buy {
+    margin-top:8px;
+    width:100%;
+    padding:7px 0;
+    border:none; border-radius:9px;
+    background:linear-gradient(90deg,#3ddc84,#2ea86a);
+    color:#06281a; font-weight:800; font-size:.85rem;
+    cursor:pointer;
+    transition:.15s;
+  }
+  .shop-buy:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 4px 14px rgba(61,220,132,.4); }
+  .shop-buy:disabled { background:rgba(255,255,255,.1); color:#666c8a; cursor:not-allowed; }
+  #shop-empty { grid-column:1/-1; text-align:center; color:#666c8a; padding:18px; }
+
+  .cases-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(150px,1fr));
+    gap:14px;
+  }
+  .case {
+    position:relative;
+    border-radius:18px;
+    padding:16px 12px;
+    text-align:center;
+    cursor:pointer;
+    transition:.18s;
+    border:2px solid rgba(255,255,255,.1);
+    background:linear-gradient(165deg,#221c44,#161330);
+    user-select:none;
+  }
+  .case:hover:not(.locked) { transform:translateY(-4px); box-shadow:0 10px 30px rgba(0,0,0,.5); }
+  .case.locked { opacity:.55; cursor:not-allowed; }
+  .case .case-emoji { font-size:3rem; display:block; margin-bottom:8px; filter:drop-shadow(0 4px 10px rgba(0,0,0,.5)); }
+  .case .case-name { font-weight:800; font-size:1.05rem; margin-bottom:4px; }
+  .case .case-desc { font-size:.72rem; color:#8f93b8; margin-bottom:10px; min-height:2em; }
+  .case .case-price {
+    display:inline-block;
+    background:rgba(0,0,0,.35);
+    padding:5px 14px; border-radius:10px;
+    font-weight:700; color:#ffd76b; font-size:.9rem;
+  }
+  .case .case-price.cant { color:#fc8181; }
+
+  #case-overlay {
+    position:fixed; inset:0; z-index:300;
+    background:rgba(8,8,20,.95);
+    backdrop-filter:blur(8px);
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    gap:20px; padding:20px;
+  }
+  #case-overlay.show { display:flex; }
+  #case-card {
+    width:min(300px, 80vw);
+    background:linear-gradient(160deg,#241d47,#161330);
+    border:2px solid rgba(255,255,255,.15);
+    border-radius:22px;
+    padding:30px 18px;
+    text-align:center;
+    transition:border-color .2s, box-shadow .2s;
+  }
+  #case-card.shaking { animation:caseshake .15s infinite; }
+  @keyframes caseshake {
+    0%{transform:translate(0,0) rotate(0)} 25%{transform:translate(-3px,2px) rotate(-1deg)}
+    50%{transform:translate(3px,-2px) rotate(1deg)} 75%{transform:translate(-2px,1px)} 100%{transform:translate(0,0)}
+  }
+  #case-card.win-flash { border-color:#68d391; box-shadow:0 0 40px rgba(104,211,145,.55); }
+  #case-card.super-flash { border-color:#ffd76b; box-shadow:0 0 50px rgba(255,215,107,.7); animation:superpulse 1s ease infinite; }
+  @keyframes superpulse { 50%{ box-shadow:0 0 80px rgba(255,120,200,.9);} }
+  #case-emoji { font-size:5rem; display:block; margin-bottom:10px; }
+  #case-name { font-weight:700; font-size:1.15rem; min-height:1.5em; }
+  #case-price { color:#ffd76b; font-weight:700; margin-top:4px; }
+  #case-rarity { font-size:.75rem; margin-top:6px; display:inline-block; padding:3px 10px; border-radius:8px; font-weight:700; }
+  #case-hint { color:#8f93b8; font-size:.9rem; }
+
+  .upgrade-layout {
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    gap:16px;
+    align-items:center;
+  }
+  @media(max-width:640px){
+    .upgrade-layout { grid-template-columns:1fr; }
+    .arrow { transform:rotate(90deg); }
+  }
+  .slot {
+    background:rgba(0,0,0,.28);
+    border:2px dashed rgba(255,255,255,.15);
+    border-radius:16px;
+    padding:18px 12px;
+    text-align:center;
+    min-height:150px;
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+    gap:6px;
+  }
+  .slot .emoji { font-size:2.6rem; }
+  .slot .name { font-weight:600; font-size:.95rem; }
+  .slot .price { color:#ffd76b; font-size:.85rem; }
+  .slot.empty { color:#666c8a; font-size:.9rem; }
+  #slot-to { cursor:pointer; }
+  #slot-to:hover { border-color:#7a5cff; }
+
+  .arrow {
+    font-size:2rem; color:#a06bff;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+  }
+  .chance { font-size:.85rem; font-weight:700; color:#ffd76b; }
+
+  .actions { margin-top:18px; display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  .btn {
+    padding:12px 26px; border:none; border-radius:12px; cursor:pointer;
+    font-size:1rem; font-weight:700; color:#fff;
+    background:linear-gradient(90deg,#7a5cff,#ff6bcb);
+    transition:.18s;
+  }
+  .btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 8px 24px rgba(122,92,255,.4); }
+  .btn:disabled { opacity:.4; cursor:not-allowed; }
+  .btn.ghost { background:rgba(255,255,255,.08); color:#cdd6e4; }
+  .btn.ghost:hover:not(:disabled) { background:rgba(255,255,255,.14); box-shadow:none; }
+
+  .log {
+    margin-top:18px;
+    max-height:180px; overflow-y:auto;
+    background:rgba(0,0,0,.3);
+    border-radius:12px; padding:12px 16px;
+    font-size:.88rem; line-height:1.6;
+    color:#b9bdd8;
+  }
+  .log .win { color:#68d391; font-weight:600; }
+  .log .lose { color:#fc8181; font-weight:600; }
+
+  .toast {
+    position:fixed; left:50%; top:24px; transform:translate(-50%,-120%);
+    background:rgba(20,18,43,.95);
+    border:1px solid rgba(255,255,255,.15);
+    padding:14px 26px; border-radius:14px;
+    font-weight:700; z-index:99;
+    transition:transform .35s ease;
+    box-shadow:0 12px 40px rgba(0,0,0,.6);
+    text-align:center;
+  }
+  .toast.show { transform:translate(-50%,0); }
+  .toast.win { color:#68d391; border-color:#68d391; }
+  .toast.lose { color:#fc8181; border-color:#fc8181; }
+
+  #mine-wrap {
+    position:relative;
+    width:230px; height:230px;
+    margin:14px auto 6px;
+    cursor:pointer;
+    user-select:none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #rock {
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:7.5rem;
+    transition:transform .08s;
+    z-index:1;
+  }
+  #rock.shake { animation:shake .18s; }
+  @keyframes shake {
+    0%{transform:translate(0,0) rotate(0)}
+    25%{transform:translate(-5px,2px) rotate(-2deg)}
+    50%{transform:translate(4px,-3px) rotate(2deg)}
+    75%{transform:translate(-3px,1px) rotate(-1deg)}
+    100%{transform:translate(0,0)}
+  }
+  #rock.breaking { animation:rockbreak .5s forwards; }
+  @keyframes rockbreak {
+    0%{transform:scale(1); opacity:1}
+    40%{transform:scale(1.15) rotate(4deg)}
+    100%{transform:scale(0) rotate(30deg); opacity:0}
+  }
+  .crack {
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:7.5rem; z-index:2; pointer-events:none;
+    opacity:0; transition:opacity .2s;
+  }
+  .crack.show { opacity:1; }
+  #pick {
+    position:absolute;
+    font-size:3.6rem;
+    left:-30px; top:-24px;
+    transform-origin:bottom right;
+    z-index:3;
+    pointer-events:none;
+    filter:drop-shadow(0 4px 6px rgba(0,0,0,.5));
+  }
+  #pick.swing { animation:swing .22s ease-out; }
+  @keyframes swing {
+    0%{transform:rotate(0)}
+    40%{transform:rotate(-55deg) translate(14px,10px)}
+    100%{transform:rotate(0)}
+  }
+  .dmg {
+    position:absolute;
+    font-weight:800; font-size:1.4rem; color:#ffd76b;
+    z-index:4; pointer-events:none;
+    animation:dmgup .8s ease-out forwards;
+    text-shadow:0 2px 8px rgba(0,0,0,.7);
+  }
+  @keyframes dmgup {
+    0%{opacity:1; transform:translateY(0) scale(1)}
+    100%{opacity:0; transform:translateY(-70px) scale(1.3)}
+  }
+  #mine-hpbar {
+    width:230px; height:16px;
+    background:rgba(0,0,0,.4);
+    border-radius:10px;
+    margin:10px auto 4px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,.12);
+  }
+  #mine-hpfill {
+    height:100%;
+    background:linear-gradient(90deg,#ff6bcb,#ffb86b);
+    border-radius:10px;
+    transition:width .15s;
+  }
+  #mine-info { text-align:center; color:#8f93b8; font-size:.9rem; margin-bottom:6px; }
+  #mine-info b { color:#ffd76b; }
+  #pick-upgrade-box { max-width:360px; margin:14px auto 4px; padding:14px; border-radius:16px; background:rgba(255,255,255,.055); border:1px solid rgba(255,255,255,.12); text-align:center; }
+  #pick-upgrade-title { font-weight:800; color:#ffe08a; margin-bottom:6px; }
+  #pick-upgrade-desc { color:#aeb4d2; font-size:.88rem; margin-bottom:10px; }
+  #pick-upgrade-btn { width:100%; }
+  .mine-reward-pop {
+    position:absolute; left:50%; top:40%;
+    transform:translate(-50%,-50%);
+    font-size:2.4rem; z-index:5; pointer-events:none;
+    animation:pop .9s ease-out forwards;
+  }
+  @keyframes pop {
+    0%{opacity:0; transform:translate(-50%,-50%) scale(.3)}
+    30%{opacity:1; transform:translate(-50%,-50%) scale(1.2)}
+    100%{opacity:1; transform:translate(-50%,-50%) scale(1)}
+  }
+
+  #anim-overlay {
+    position:fixed; inset:0; z-index:200;
+    background:rgba(8,8,20,.94);
+    backdrop-filter: blur(6px);
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    gap:18px; padding:20px;
+  }
+  #anim-overlay.show { display:flex; }
+  #wheel-wrap {
+    position:relative;
+    width:min(330px, 78vw);
+    height:min(330px, 78vw);
+  }
+  #anim-canvas { width:100%; height:100%; filter: drop-shadow(0 0 30px rgba(122,92,255,.35)); }
+  /* Крутится указатель, а само колесо остаётся неподвижным */
+  #wheel-pointer {
+    position:absolute; left:calc(50% - 2px); top:2%;
+    width:4px; height:48%;
+    background:#ffd76b;
+    border-radius:4px;
+    transform:rotate(0rad);
+    transform-origin:50% 100%;
+    filter: drop-shadow(0 0 8px rgba(255,215,107,.9));
+    z-index:2;
+  }
+  #wheel-pointer::before {
+    content:""; position:absolute; top:-2px; left:50%;
+    transform:translateX(-50%);
+    width:0; height:0;
+    border-left:9px solid transparent;
+    border-right:9px solid transparent;
+    border-bottom:17px solid #ffd76b;
+  }
+  #anim-title { font-size:1.25rem; font-weight:700; color:#d6c9ff; text-align:center; }
+  #anim-title .from { color:#eaeaea; }
+  #anim-title .to { color:#ffd76b; }
+  #anim-result {
+    font-size:2.2rem; font-weight:800;
+    opacity:0; transform:scale(.5);
+    transition:all .3s cubic-bezier(.2,2.2,.4,1);
+  }
+  #anim-result.show { opacity:1; transform:scale(1); }
+  #anim-result.win { color:#68d391; text-shadow:0 0 30px rgba(104,211,145,.6); }
+  #anim-result.lose { color:#fc8181; text-shadow:0 0 30px rgba(252,129,129,.6); }
+  #anim-chance { color:#8f93b8; font-size:.95rem; }
+
+/* Telegram-inspired gift artwork and account screen */
+.gift,.shop-item{overflow:hidden;isolation:isolate;background:linear-gradient(145deg,rgba(255,255,255,.14),transparent 35%),radial-gradient(ellipse at 50% 0%,rgba(151,125,255,.2),transparent 65%),linear-gradient(160deg,#29204e,#141126);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 8px 18px rgba(0,0,0,.18)}
+.gift:before,.shop-item:before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 25%,rgba(255,255,255,.06) 45%,transparent 62%);z-index:-1}
+.gift .emoji,.shop-item .emoji{font-size:2.7rem;filter:drop-shadow(0 5px 5px rgba(0,0,0,.35));text-shadow:0 0 18px rgba(255,255,255,.13);}
+.gift .emoji{padding:9px 0 4px}
+.r-legend{box-shadow:0 0 12px rgba(255,196,70,.22)}
+.r-super{box-shadow:0 0 16px rgba(255,107,203,.4)}
+#account-screen{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(circle at 20% 0%,#2a1a4a,#0a0a18 75%)}
+.account-card{width:min(420px,100%);padding:26px;border:1px solid rgba(255,255,255,.13);border-radius:24px;background:rgba(25,21,49,.96);box-shadow:0 24px 80px #0008}
+.account-card h2{text-align:center;color:#e1d6ff;margin-bottom:8px}.account-card p{text-align:center;color:#9b9fbe;font-size:.9rem;margin-bottom:18px;line-height:1.45}
+.account-card input{display:block;width:100%;margin:10px 0;padding:13px 14px;border-radius:12px;border:1px solid #ffffff24;background:#0d0b1d;color:#fff;font-size:1rem;outline:none}
+.account-card input:focus{border-color:#a06bff}.account-card .btn{width:100%;margin-top:8px}.account-switch{display:flex;gap:8px;margin-bottom:16px}.account-switch button{flex:1;padding:10px;border-radius:10px;border:1px solid #ffffff18;background:#ffffff08;color:#cdd6e4}.account-switch button.active{background:linear-gradient(90deg,#7a5cff,#ff6bcb);color:white}
+#account-status{min-height:1.3em;color:#ff9aa8;text-align:center;font-size:.85rem;margin-top:10px}
+.account-bar{display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;color:#b9bdd8;font-size:.85rem}.account-bar button{background:#ffffff12;border:1px solid #ffffff20;color:#ddd6ff;border-radius:9px;padding:6px 10px}
+</style>
+</head>
+<body>
+
+<div id="account-screen">
+  <div class="account-card">
+    <h2>🎁 Твой аккаунт</h2>
+    <p>Создай локальный профиль, чтобы сохранять звёзды, подарки и уровень шахты на этом устройстве.</p>
+    <div class="account-switch"><button id="login-tab" class="active" type="button">Войти</button><button id="register-tab" type="button">Регистрация</button></div>
+    <form id="account-form"><input id="account-name" autocomplete="username" maxlength="24" placeholder="Логин" required><input id="account-password" autocomplete="current-password" type="password" minlength="4" placeholder="Пароль (от 4 символов)" required><button class="btn" id="account-submit" type="submit">Войти</button></form>
+    <div id="account-status"></div>
+    <p style="font-size:.75rem;margin:14px 0 0">Важно: это локальные аккаунты браузера, не Telegram-авторизация. Не используй настоящий пароль.</p>
+  </div>
+</div>
+<header>
+  <h1>🎁 Апгрейдер подарков</h1>
+  <p>Открывай кейсы, копай звёзды и прокачивай подарки</p>
+</header>
+
+<div class="wallet">⭐ Баланс: <span id="balance">1000</span> звёзд</div><div class="account-bar"><span id="account-label">Гость</span><button id="switch-account" type="button">Сменить аккаунт</button></div>
+
+<main>
+  <section class="panel">
+    <h2>📦 Кейсы</h2>
+    <div class="cases-grid" id="cases-grid"></div>
+  </section>
+
+  <section class="panel">
+    <h2>🛒 Магазин подарков</h2>
+    <div class="shop-controls" id="shop-filters"></div>
+    <div class="shop-controls">
+      <input type="text" id="shop-search" placeholder="🔍 Поиск подарка...">
+    </div>
+    <div id="shop-grid"></div>
+  </section>
+
+  <section class="panel">
+    <h2>🎒 Инвентарь <small style="color:#8f93b8;font-weight:400;font-size:.8rem" id="inv-hint">(можно выбрать несколько)</small></h2>
+    <div class="inventory" id="inventory"></div>
+  </section>
+
+  <section class="panel">
+    <h2>⬆️ Апгрейд</h2>
+    <div class="upgrade-layout">
+      <div class="slot empty" id="slot-from">Выбери подарки в инвентаре</div>
+      <div class="arrow">
+        <div>➡️</div>
+        <div class="chance" id="chance-label">—</div>
+      </div>
+      <div class="slot empty" id="slot-to">Цель апгрейда</div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="upgrade-btn" disabled>🚀 Апгрейд</button>
+      <button class="btn ghost" id="clear-btn">✖ Сбросить</button>
+    </div>
+    <div class="log" id="log"></div>
+  </section>
+
+  <section class="panel">
+    <h2>⛏️ Шахта — игра «Кирка»</h2>
+    <div id="mine-info">Камень <b id="mine-level">1</b> уровня · награда: <b id="mine-reward">0</b> ⭐ · 12% шанс подарка</div>
+    <div id="mine-wrap">
+      <div id="rock">🪨</div>
+      <div class="crack" id="crack1">🩹</div>
+      <div class="crack" id="crack2">💢</div>
+      <div id="pick">⛏️</div>
+    </div>
+    <div id="mine-hpbar"><div id="mine-hpfill" style="width:100%"></div></div>
+    <div id="pick-upgrade-box">
+      <div id="pick-upgrade-title">⛏️ Кирка уровня <span id="pick-level">1</span></div>
+      <div id="pick-upgrade-desc">Урон за удар: <b id="pick-damage">1</b>. Улучшай кирку, чтобы быстрее ломать камни!</div>
+      <button class="btn" id="pick-upgrade-btn" onclick="upgradePickaxe()">⬆️ Улучшить за 250 ⭐</button>
+    </div>
+    <div id="mine-info">Кликай по камню, чтобы разбить!</div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<div id="case-overlay">
+  <div id="case-card">
+    <span id="case-emoji">❓</span>
+    <div id="case-name">???</div>
+    <div id="case-rarity"></div>
+    <div id="case-price"></div>
+  </div>
+  <div id="case-hint">Открываем кейс...</div>
+</div>
+
+<div id="anim-overlay">
+  <div id="anim-title"></div>
+  <div id="wheel-wrap">
+    <div id="wheel-pointer"></div>
+    <canvas id="anim-canvas" width="330" height="330"></canvas>
+  </div>
+  <div id="anim-chance"></div>
+  <div id="anim-result"></div>
+</div>
+
+<script>
+// ---------- Telegram WebApp ----------
+const tg = window.Telegram ? window.Telegram.WebApp : null;
+if (tg) {
+  tg.ready();
+  tg.expand();
+  tg.setHeaderColor('#14122b');
+  tg.setBackgroundColor('#0a0a18');
+  tg.BackButton.onClick(() => {
+    if (animRunning || caseOpening) return;
+    tg.close();
+  });
+}
+function haptic(type){ if (tg) tg.HapticFeedback.impactOccurred(type); }
+function hapticNote(type){ if (tg) tg.HapticFeedback.notificationOccurred(type); }
+
+// ---------- Данные: подарки ----------
+const GIFTS = [
+  { id:'common1', emoji:'🎈', name:'Воздушный шар',   price:50,   rarity:'common' },
+  { id:'common2', emoji:'🍬', name:'Конфета',         price:80,   rarity:'common' },
+  { id:'common3', emoji:'🧸', name:'Мишка',           price:120,  rarity:'common' },
+  { id:'common4', emoji:'🌹', name:'Роза',            price:150,  rarity:'common' },
+  { id:'rare1',   emoji:'🍾', name:'Шампанское',      price:300,  rarity:'rare' },
+  { id:'rare2',   emoji:'💎', name:'Кристалл',        price:450,  rarity:'rare' },
+  { id:'rare3',   emoji:'🎧', name:'Наушники',        price:600,  rarity:'rare' },
+  { id:'epic1',   emoji:'🚀', name:'Ракета',          price:900,  rarity:'epic' },
+  { id:'epic2',   emoji:'🏆', name:'Кубок',           price:1300, rarity:'epic' },
+  { id:'epic3',   emoji:'👑', name:'Корона',          price:1800, rarity:'epic' },
+  { id:'legend1', emoji:'🐉', name:'Дракон',          price:2500, rarity:'legend' },
+  { id:'legend2', emoji:'🌟', name:'Звезда',          price:3500, rarity:'legend' },
+  { id:'legend3', emoji:'💍', name:'Кольцо',          price:5000, rarity:'legend' },
+  { id:'rare_n1', emoji:'🪙', name:'Монета', price:250, rarity:'rare' },
+  { id:'rare_n2', emoji:'🔑', name:'Золотой ключ', price:290, rarity:'rare' },
+  { id:'rare_n3', emoji:'📚', name:'Книга', price:330, rarity:'rare' },
+  { id:'rare_n4', emoji:'🎸', name:'Гитара', price:370, rarity:'rare' },
+  { id:'rare_n5', emoji:'🎯', name:'Мишень', price:410, rarity:'rare' },
+  { id:'rare_n6', emoji:'🎳', name:'Шар для боулинга', price:450, rarity:'rare' },
+  { id:'rare_n7', emoji:'🏀', name:'Мяч', price:490, rarity:'rare' },
+  { id:'rare_n8', emoji:'⚽', name:'Футбольный мяч', price:530, rarity:'rare' },
+  { id:'rare_n9', emoji:'🏓', name:'Ракетка', price:570, rarity:'rare' },
+  { id:'rare_n10', emoji:'🎿', name:'Лыжа', price:610, rarity:'rare' },
+  { id:'rare_n11', emoji:'⛸️', name:'Конёк', price:650, rarity:'rare' },
+  { id:'rare_n12', emoji:'🛹', name:'Скейт', price:690, rarity:'rare' },
+  { id:'rare_n13', emoji:'🪁', name:'Воздушный змей', price:730, rarity:'rare' },
+  { id:'rare_n14', emoji:'🔭', name:'Телескоп', price:770, rarity:'rare' },
+  { id:'rare_n15', emoji:'🧭', name:'Компас', price:810, rarity:'rare' },
+  { id:'rare_n16', emoji:'🗺️', name:'Карта сокровищ', price:850, rarity:'rare' },
+  { id:'rare_n17', emoji:'🏮', name:'Китайский фонарь', price:890, rarity:'rare' },
+  { id:'rare_n18', emoji:'🎏', name:'Вымпел', price:930, rarity:'rare' },
+  { id:'rare_n19', emoji:'🧧', name:'Конверт удачи', price:970, rarity:'rare' },
+  { id:'rare_n20', emoji:'🪔', name:'Лампа', price:1010, rarity:'rare' },
+  { id:'rare_n21', emoji:'🕯️', name:'Свеча', price:1050, rarity:'rare' },
+  { id:'rare_n22', emoji:'🔮', name:'Хрустальный шар', price:1090, rarity:'rare' },
+  { id:'rare_n23', emoji:'📿', name:'Чётки', price:1130, rarity:'rare' },
+  { id:'rare_n24', emoji:'🎐', name:'Музыка ветра', price:1170, rarity:'rare' },
+  { id:'rare_n25', emoji:'🏺', name:'Амфора', price:1210, rarity:'rare' },
+  { id:'rare_n26', emoji:'🗿', name:'Моаи', price:1250, rarity:'rare' },
+  { id:'rare_n27', emoji:'🦴', name:'Кость динозавра', price:1290, rarity:'rare' },
+  { id:'rare_n28', emoji:'🪶', name:'Перо феникса', price:1330, rarity:'rare' },
+  { id:'rare_n29', emoji:'🐚', name:'Жемчужина', price:1370, rarity:'rare' },
+  { id:'rare_n30', emoji:'🌙', name:'Полумесяц', price:1410, rarity:'rare' },
+  { id:'rare_n31', emoji:'⭐', name:'Звёздная пыль', price:1450, rarity:'rare' },
+  { id:'rare_n32', emoji:'🌈', name:'Радуга', price:1490, rarity:'rare' },
+  { id:'rare_n33', emoji:'🔥', name:'Вечный огонь', price:1530, rarity:'rare' },
+  { id:'rare_n34', emoji:'❄️', name:'Вечная мерзлота', price:1570, rarity:'rare' },
+  { id:'rare_n35', emoji:'⚡', name:'Молния в бутылке', price:1610, rarity:'rare' },
+  { id:'rare_n36', emoji:'🍀', name:'Лист клевера', price:1650, rarity:'rare' },
+  { id:'rare_n37', emoji:'🌻', name:'Подсолнух', price:1690, rarity:'rare' },
+  { id:'rare_n38', emoji:'🌵', name:'Кактус', price:1730, rarity:'rare' },
+  { id:'rare_n39', emoji:'🍄', name:'Мухомор', price:1770, rarity:'rare' },
+  { id:'rare_n40', emoji:'🐞', name:'Божья коровка', price:1810, rarity:'rare' },
+  { id:'epic_n1', emoji:'🎩', name:'Цилиндр фокусника', price:950, rarity:'epic' },
+  { id:'epic_n2', emoji:'🪄', name:'Волшебная палочка', price:1040, rarity:'epic' },
+  { id:'epic_n3', emoji:'📜', name:'Древний свиток', price:1130, rarity:'epic' },
+  { id:'epic_n4', emoji:'🗡️', name:'Клинок', price:1220, rarity:'epic' },
+  { id:'epic_n5', emoji:'🛡️', name:'Щит паладина', price:1310, rarity:'epic' },
+  { id:'epic_n6', emoji:'🏹', name:'Лук лучника', price:1400, rarity:'epic' },
+  { id:'epic_n7', emoji:'⚔️', name:'Скрещённые мечи', price:1490, rarity:'epic' },
+  { id:'epic_n8', emoji:'👁️', name:'Око провидца', price:1580, rarity:'epic' },
+  { id:'epic_n9', emoji:'🕰️', name:'Часы времени', price:1670, rarity:'epic' },
+  { id:'epic_n10', emoji:'⏳', name:'Песочные часы', price:1760, rarity:'epic' },
+  { id:'epic_n11', emoji:'🧿', name:'Синий глаз', price:1850, rarity:'epic' },
+  { id:'epic_n12', emoji:'🗝️', name:'Ключ от всех дверей', price:1940, rarity:'epic' },
+  { id:'epic_n13', emoji:'🚪', name:'Волшебная дверь', price:2030, rarity:'epic' },
+  { id:'epic_n14', emoji:'🪞', name:'Зеркало истины', price:2120, rarity:'epic' },
+  { id:'epic_n15', emoji:'📯', name:'Горн', price:2210, rarity:'epic' },
+  { id:'epic_n16', emoji:'🎺', name:'Труба', price:2300, rarity:'epic' },
+  { id:'epic_n17', emoji:'🥁', name:'Барабан', price:2390, rarity:'epic' },
+  { id:'epic_n18', emoji:'🪕', name:'Банджо', price:2480, rarity:'epic' },
+  { id:'epic_n19', emoji:'🎻', name:'Скрипка', price:2570, rarity:'epic' },
+  { id:'epic_n20', emoji:'🎹', name:'Пианино', price:2660, rarity:'epic' },
+  { id:'epic_n21', emoji:'🏰', name:'Замок', price:2750, rarity:'epic' },
+  { id:'epic_n22', emoji:'🗼', name:'Эйфелева башня', price:2840, rarity:'epic' },
+  { id:'epic_n23', emoji:'🌋', name:'Вулкан', price:2930, rarity:'epic' },
+  { id:'epic_n24', emoji:'🏔️', name:'Эверест', price:3020, rarity:'epic' },
+  { id:'epic_n25', emoji:'🗾', name:'Священная земля', price:3110, rarity:'epic' },
+  { id:'epic_n26', emoji:'🎡', name:'Колесо обозрения', price:3200, rarity:'epic' },
+  { id:'epic_n27', emoji:'🎢', name:'Американские горки', price:3290, rarity:'epic' },
+  { id:'epic_n28', emoji:'🎪', name:'Цирковой шатёр', price:3380, rarity:'epic' },
+  { id:'epic_n29', emoji:'🎭', name:'Маски', price:3470, rarity:'epic' },
+  { id:'epic_n30', emoji:'🖼️', name:'Картина да Винчи', price:3560, rarity:'epic' },
+  { id:'legend_n1', emoji:'🐲', name:'Дракон-титан', price:2600, rarity:'legend' },
+  { id:'legend_n2', emoji:'👑', name:'Корона королей', price:2860, rarity:'legend' },
+  { id:'legend_n3', emoji:'💠', name:'Бриллиант', price:3120, rarity:'legend' },
+  { id:'legend_n4', emoji:'🏵️', name:'Роза ветров', price:3380, rarity:'legend' },
+  { id:'legend_n5', emoji:'🎖️', name:'Медаль героя', price:3640, rarity:'legend' },
+  { id:'legend_n6', emoji:'🏆', name:'Кубок чемпионов', price:3900, rarity:'legend' },
+  { id:'legend_n7', emoji:'👸', name:'Королева', price:4160, rarity:'legend' },
+  { id:'legend_n8', emoji:'🤴', name:'Принц', price:4420, rarity:'legend' },
+  { id:'legend_n9', emoji:'🧙', name:'Верховный маг', price:4680, rarity:'legend' },
+  { id:'legend_n10', emoji:'🧝', name:'Эльфийский лорд', price:4940, rarity:'legend' },
+  { id:'legend_n11', emoji:'🦹', name:'Тёмный властелин', price:5200, rarity:'legend' },
+  { id:'legend_n12', emoji:'🧛', name:'Граф Дракула', price:5460, rarity:'legend' },
+  { id:'legend_n13', emoji:'🧟', name:'Лич-император', price:5720, rarity:'legend' },
+  { id:'legend_n14', emoji:'👻', name:'Призрак дворца', price:5980, rarity:'legend' },
+  { id:'legend_n15', emoji:'🦅', name:'Феникс', price:6240, rarity:'legend' },
+  { id:'legend_n16', emoji:'🦄', name:'Единорог', price:6500, rarity:'legend' },
+  { id:'legend_n17', emoji:'🐺', name:'Вожак волков', price:6760, rarity:'legend' },
+  { id:'legend_n18', emoji:'🦁', name:'Лев-страж', price:7020, rarity:'legend' },
+  { id:'legend_n19', emoji:'🐯', name:'Тигр-полководец', price:7280, rarity:'legend' },
+  { id:'legend_n20', emoji:'🐆', name:'Пантера', price:7540, rarity:'legend' },
+  { id:'legend_n21', emoji:'🦈', name:'Мегалодон', price:7800, rarity:'legend' },
+  { id:'legend_n22', emoji:'🐋', name:'Левиафан', price:8060, rarity:'legend' },
+  { id:'legend_n23', emoji:'🦖', name:'Ти-рекс', price:8320, rarity:'legend' },
+  { id:'legend_n24', emoji:'🦕', name:'Бронтозавр', price:8580, rarity:'legend' },
+  { id:'legend_n25', emoji:'🐍', name:'Королевская кобра', price:8840, rarity:'legend' },
+  { id:'legend_n26', emoji:'🦂', name:'Скорпион царя', price:9100, rarity:'legend' },
+  { id:'legend_n27', emoji:'🕷️', name:'Чёрная вдова', price:9360, rarity:'legend' },
+  { id:'legend_n28', emoji:'🦇', name:'Вампирская стая', price:9620, rarity:'legend' },
+  { id:'legend_n29', emoji:'🦉', name:'Сова мудрости', price:9880, rarity:'legend' },
+  { id:'legend_n30', emoji:'🦚', name:'Павлин императора', price:10140, rarity:'legend' },
+  { id:'super1',  emoji:'🧸', name:'Супер Мишка',     price:1000000, rarity:'super' },
+];
+
+const RARITY_LABEL = { common:'Обычный', rare:'Редкий', epic:'Эпик', legend:'Легенда', super:'СУПЕР' };
+
+// ---------- КЕЙСЫ ----------
+const CASES = [
+  { id:'bomj',     name:'Бомж',        price:100,   emoji:'🥫',
+    desc:'Выпадает самое дешёвое барахло',
+    pool: g => g.rarity==='common' },
+  { id:'middle',   name:'Среднячок',   price:500,   emoji:'📦',
+    desc:'Обычные и редкие подарки',
+    pool: g => g.rarity==='common' || (g.rarity==='rare' && g.price<=700) },
+  { id:'rich',     name:'Богач',       price:1500,  emoji:'💼',
+    desc:'Редкие и эпические подарки',
+    pool: g => (g.rarity==='rare' && g.price>=300) || (g.rarity==='epic' && g.price<=1500) },
+  { id:'million',  name:'Миллионер',   price:5000,  emoji:'💰',
+    desc:'Эпики и начальные легенды',
+    pool: g => g.rarity==='epic' || (g.rarity==='legend' && g.price<=5000) },
+  { id:'billion',  name:'Миллиардер',  price:15000, emoji:'🏦',
+    desc:'Мощные легенды до 8000 ⭐',
+    pool: g => (g.rarity==='legend' && g.price<=8000) },
+  { id:'trillion', name:'Триллионер',  price:50000, emoji:'🚀',
+    desc:'Лучшие легенды + шанс на Супер Мишку!',
+    pool: g => (g.rarity==='legend' && g.price>=5000) || g.rarity==='super' },
+];
+
+// ---------- Состояние ----------
+let balance = 1000;
+let currentUser = null;
+let authMode = 'login';
+let inventory = [];
+let selectedUids = []; // несколько подарков для одного апгрейда
+let targetId = null;
+let uidCounter = 1;
+let animRunning = false;
+let caseOpening = false;
+
+// ---------- DOM ----------
+const invEl      = document.getElementById('inventory');
+const balanceEl  = document.getElementById('balance');
+const slotFrom   = document.getElementById('slot-from');
+const slotTo     = document.getElementById('slot-to');
+const chanceLbl  = document.getElementById('chance-label');
+const upgradeBtn = document.getElementById('upgrade-btn');
+const clearBtn   = document.getElementById('clear-btn');
+const casesGrid  = document.getElementById('cases-grid');
+const logEl      = document.getElementById('log');
+const toastEl    = document.getElementById('toast');
+const animOverlay= document.getElementById('anim-overlay');
+const animCanvas = document.getElementById('anim-canvas');
+const animTitle  = document.getElementById('anim-title');
+const animChance = document.getElementById('anim-chance');
+const animResult = document.getElementById('anim-result');
+const actx       = animCanvas.getContext('2d');
+const caseOverlay= document.getElementById('case-overlay');
+const caseCard   = document.getElementById('case-card');
+const caseEmoji  = document.getElementById('case-emoji');
+const caseName   = document.getElementById('case-name');
+const caseRarEl  = document.getElementById('case-rarity');
+const casePriceEl= document.getElementById('case-price');
+const caseHint   = document.getElementById('case-hint');
+
+// ---------- Утилиты ----------
+function giftById(id){ return GIFTS.find(g=>g.id===id); }
+function invItem(uid){ return inventory.find(i=>i.uid===uid); }
+function fmt(n){ return n.toLocaleString('ru-RU'); }
+
+function updateBalance(){
+  balanceEl.textContent = fmt(balance);
+  saveGame();
+  renderCases();
+  renderShop();
+  if(typeof updatePickaxeUI === 'function') updatePickaxeUI();
+}
+
+function toast(msg, type=''){
+  toastEl.textContent = msg;
+  toastEl.className = 'toast show ' + type;
+  clearTimeout(toastEl._t);
+  toastEl._t = setTimeout(()=>toastEl.classList.remove('show'), 2200);
+}
+
+function log(msg, cls=''){
+  const d = document.createElement('div');
+  if(cls) d.className = cls;
+  d.innerHTML = msg;
+  logEl.prepend(d);
+  while(logEl.children.length > 30) logEl.removeChild(logEl.lastChild);
+}
+
+// ---------- МАГАЗИН ----------
+const shopGrid    = document.getElementById('shop-grid');
+const shopFilters = document.getElementById('shop-filters');
+const shopSearch  = document.getElementById('shop-search');
+let shopRarity = 'all';
+
+function renderShopFilters(){
+  const filters = [
+    {id:'all', label:'Все'},
+    {id:'common', label:'Обычные'},
+    {id:'rare', label:'Редкие'},
+    {id:'epic', label:'Эпики'},
+    {id:'legend', label:'Легенды'},
+    {id:'super', label:'Супер'},
+  ];
+  shopFilters.innerHTML = '';
+  filters.forEach(f=>{
+    const b = document.createElement('button');
+    b.className = 'shop-filter' + (shopRarity===f.id ? ' active' : '');
+    b.textContent = f.label;
+    b.onclick = ()=>{ shopRarity = f.id; haptic('light'); renderShopFilters(); renderShop(); };
+    shopFilters.appendChild(b);
+  });
+}
+
+function renderShop(){
+  const q = (shopSearch.value || '').toLowerCase().trim();
+  let items = GIFTS.filter(g =>
+    (shopRarity==='all' || g.rarity===shopRarity) &&
+    (!q || g.name.toLowerCase().includes(q))
+  );
+  items.sort((a,b)=>a.price-b.price);
+
+  shopGrid.innerHTML = '';
+  if(items.length===0){
+    shopGrid.innerHTML = '<div id="shop-empty">Ничего не найдено 🔍</div>';
+    return;
+  }
+  items.forEach(g=>{
+    const can = balance >= g.price;
+    const div = document.createElement('div');
+    div.className = 'shop-item';
+    div.innerHTML = `
+      <span class="rarity r-${g.rarity}">${RARITY_LABEL[g.rarity]}</span>
+      <span class="emoji">${g.emoji}</span>
+      <div class="name">${g.name}</div>
+      <button class="shop-buy" ${can?'':'disabled'}>${fmt(g.price)} ⭐</button>
+    `;
+    const btn = div.querySelector('.shop-buy');
+    if(can){
+      btn.onclick = ()=>{
+        if(balance < g.price) return;
+        balance -= g.price;
+        updateBalance();
+        haptic('medium');
+        addToInventory(g.id);
+        log(`🛒 Куплен <b>${g.emoji} ${g.name}</b> за ${fmt(g.price)} ⭐`);
+        toast(`Куплен ${g.emoji} ${g.name}!`);
+      };
+    }
+    shopGrid.appendChild(div);
+  });
+}
+
+shopSearch.addEventListener('input', renderShop);
+
+// ---------- Кейсы: рендер ----------
+function renderCases(){
+  casesGrid.innerHTML = '';
+  CASES.forEach(c=>{
+    const can = balance >= c.price;
+    const div = document.createElement('div');
+    div.className = 'case' + (can ? '' : ' locked');
+    div.innerHTML = `
+      <span class="case-emoji">${c.emoji}</span>
+      <div class="case-name">${c.name}</div>
+      <div class="case-desc">${c.desc}</div>
+      <span class="case-price ${can?'':'cant'}">${fmt(c.price)} ⭐</span>
+    `;
+    if(can) div.onclick = ()=>openCase(c);
+    casesGrid.appendChild(div);
+  });
+}
+
+// ---------- Кейсы: открытие с анимацией ----------
+function pickFromCase(c){
+  const pool = GIFTS.filter(c.pool);
+  const weights = pool.map(g => g.rarity==='super' ? 0.02 : 1 / Math.sqrt(g.price));
+  const total = weights.reduce((a,b)=>a+b, 0);
+  let r = Math.random() * total;
+  for(let i=0;i<pool.length;i++){
+    r -= weights[i];
+    if(r <= 0) return pool[i];
+  }
+  return pool[pool.length-1];
+}
+
+function openCase(c){
+  if(caseOpening || animRunning) return;
+  if(balance < c.price){ toast('Не хватает звёзд ⭐', 'lose'); hapticNote('error'); return; }
+
+  balance -= c.price;
+  updateBalance();
+
+  const won = pickFromCase(c);
+  caseOpening = true;
+  caseOverlay.classList.add('show');
+  caseCard.className = '';
+  caseRarEl.textContent = '';
+  casePriceEl.textContent = '';
+  caseHint.textContent = 'Открываем кейс «' + c.name + '»...';
+  caseCard.classList.add('shaking');
+
+  const pool = GIFTS.filter(c.pool);
+  let delay = 60;
+  let elapsed = 0;
+  let timer;
+
+  function tick(){
+    const g = pool[Math.floor(Math.random()*pool.length)];
+    caseEmoji.textContent = g.emoji;
+    caseName.textContent = g.name;
+    haptic('light');
+
+    elapsed += delay;
+    delay *= 1.22;
+    if(elapsed > 2600){
+      showCaseResult(won, c);
+    } else {
+      timer = setTimeout(tick, delay);
+    }
+  }
+  timer = setTimeout(tick, delay);
+}
+
+function showCaseResult(won, c){
+  caseCard.classList.remove('shaking');
+  caseEmoji.textContent = won.emoji;
+  caseName.textContent = won.name;
+  casePriceEl.textContent = fmt(won.price) + ' ⭐';
+  caseRarEl.textContent = RARITY_LABEL[won.rarity];
+  caseRarEl.className = 'r-' + won.rarity;
+
+  const isSuper = won.rarity==='super';
+  caseCard.classList.add(isSuper ? 'super-flash' : 'win-flash');
+  caseHint.textContent = isSuper ? '🌈 МЕГА-ВЫИГРЫШ!!! 🌈' : 'Поздравляем!';
+  hapticNote('success');
+  if(isSuper){ haptic('heavy'); }
+
+  addToInventory(won.id, true);
+  renderInventory();
+  log(`📦 Кейс «<b>${c.name}</b>»: выпал <b>${won.emoji} ${won.name}</b> (${fmt(won.price)} ⭐)${isSuper?' 🌈 МЕГА!':''}`, 'win');
+  toast(`${won.emoji} ${won.name}!`, 'win');
+
+  setTimeout(()=>{
+    caseOverlay.classList.remove('show');
+    caseOpening = false;
+  }, 1800);
+}
+
+// ---------- Инвентарь ----------
+function addToInventory(giftId, silent=false){
+  const item = { uid: uidCounter++, giftId };
+  inventory.push(item);
+  if(!silent) renderInventory();
+  return item;
+}
+
+function removeFromInventory(uid){
+  inventory = inventory.filter(i=>i.uid!==uid);
+  saveGame();
+  selectedUids = selectedUids.filter(id=>id!==uid);
+  renderInventory();
+}
+
+function renderInventory(){
+  invEl.innerHTML = '';
+  saveGame();
+  if(inventory.length===0){
+    invEl.innerHTML = '<div style="grid-column:1/-1;color:#666c8a;text-align:center;padding:18px;">Инвентарь пуст. Открой кейс 📦 или покопай звёзды ⛏️</div>';
+    return;
+  }
+  const sorted = [...inventory].sort((a,b)=>giftById(b.giftId).price - giftById(a.giftId).price);
+  sorted.forEach(item=>{
+    const g = giftById(item.giftId);
+    const div = document.createElement('div');
+    div.className = 'gift' + (selectedUids.includes(item.uid) ? ' selected' : '');
+    div.innerHTML = `
+      <span class="rarity r-${g.rarity}">${RARITY_LABEL[g.rarity]}</span>
+      <span class="emoji">${g.emoji}</span>
+      <div class="name">${g.name}</div>
+      <div class="price">${fmt(g.price)} ⭐</div>
+    `;
+    div.onclick = ()=>selectItem(item.uid);
+    invEl.appendChild(div);
+  });
+}
+
+function selectItem(uid){
+  haptic('light');
+  selectedUids = selectedUids.includes(uid) ? selectedUids.filter(id=>id!==uid) : [...selectedUids, uid];
+  renderInventory();
+  updateUpgradeView();
+}
+
+// ---------- Апгрейд-вид ----------
+function updateUpgradeView(){
+  selectedUids = selectedUids.filter(uid=>inventory.some(item=>item.uid===uid));
+  const selectedItems = selectedUids.map(invItem).filter(Boolean);
+  const totalValue = selectedItems.reduce((sum,item)=>sum+giftById(item.giftId).price,0);
+
+  if(selectedItems.length){
+    const preview = selectedItems.slice(0,4).map(item=>{
+      const g=giftById(item.giftId); return `${g.emoji} ${g.name}`;
+    }).join(', ');
+    slotFrom.className = 'slot';
+    slotFrom.innerHTML = `<div class="emoji">${selectedItems.map(item=>giftById(item.giftId).emoji).slice(0,5).join(' ')}</div>
+      <div class="name">Выбрано подарков: ${selectedItems.length}</div>
+      <div style="font-size:.78rem;opacity:.8;max-width:100%;overflow-wrap:anywhere">${preview}${selectedItems.length>4?'…':''}</div>
+      <div class="price">Общая стоимость: ${fmt(totalValue)} ⭐</div>`;
+  } else {
+    slotFrom.className = 'slot empty';
+    slotFrom.textContent = 'Выбери один или несколько подарков в инвентаре';
+  }
+
+  if(targetId){
+    const g = giftById(targetId);
+    slotTo.className = 'slot';
+    slotTo.innerHTML = `<div class="emoji">${g.emoji}</div><div class="name">${g.name}</div><div class="price">${fmt(g.price)} ⭐</div>`;
+  } else {
+    slotTo.className = 'slot empty';
+    slotTo.textContent = 'Цель апгрейда не выбрана';
+  }
+
+  let chance = 0;
+  if(selectedItems.length && targetId){
+    const to = giftById(targetId).price;
+    if(to > totalValue) chance = Math.min(90, Math.round(totalValue / to * 100));
+  }
+  chanceLbl.textContent = chance ? `${chance}% (всего ${fmt(totalValue)} ⭐)` : '—';
+  upgradeBtn.disabled = !(selectedItems.length && targetId && chance>0);
+}
+
+// ---------- Выбор цели ----------
+slotTo.onclick = ()=>{ if(!animRunning && !caseOpening){ haptic('light'); openTargetPicker(); } };
+
+function openTargetPicker(){
+  const minPrice = selectedUids.reduce((sum,uid)=>{const it=invItem(uid);return sum+(it?giftById(it.giftId).price:0);},0);
+  const options = GIFTS.filter(g=>g.price > minPrice);
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position:fixed; inset:0; background:rgba(0,0,0,.7);
+    display:flex; align-items:center; justify-content:center; z-index:100;
+    padding:20px;
+  `;
+  const box = document.createElement('div');
+  box.style.cssText = `
+    background:#1a1733; border:1px solid rgba(255,255,255,.12);
+    border-radius:18px; padding:22px; max-width:520px; width:100%;
+    max-height:80vh; overflow-y:auto;
+  `;
+  box.innerHTML = `<h3 style="margin-bottom:14px;color:#d6c9ff;">Выбери цель апгрейда</h3>`;
+
+  if(options.length===0){
+    box.innerHTML += `<p style="color:#8f93b8;">Нет подарков дороже выбранного. Выбери подарок подешевле.</p>`;
+  } else {
+    options.forEach(g=>{
+      const row = document.createElement('div');
+      row.style.cssText = `
+        display:flex; align-items:center; gap:12px;
+        padding:10px 14px; border-radius:12px; cursor:pointer;
+        transition:.15s; margin-bottom:6px;
+      `;
+      row.onmouseenter = ()=> row.style.background='rgba(255,255,255,.08)';
+      row.onmouseleave = ()=> row.style.background='transparent';
+      row.innerHTML = `
+        <span style="font-size:1.8rem;">${g.emoji}</span>
+        <div style="flex:1;">
+          <div style="font-weight:600;">${g.name}</div>
+          <div style="font-size:.8rem;color:#8f93b8;">${RARITY_LABEL[g.rarity]}</div>
+        </div>
+        <div style="color:#ffd76b;font-weight:700;">${fmt(g.price)} ⭐</div>
+      `;
+      row.onclick = ()=>{
+        haptic('medium');
+        targetId = g.id;
+        document.body.removeChild(overlay);
+        updateUpgradeView();
+      };
+      box.appendChild(row);
+    });
+  }
+
+  const close = document.createElement('button');
+  close.textContent = 'Отмена';
+  close.className = 'btn ghost';
+  close.style.marginTop = '12px';
+  close.onclick = ()=> document.body.removeChild(overlay);
+  box.appendChild(close);
+
+  overlay.appendChild(box);
+  overlay.onclick = (e)=>{ if(e.target===overlay) document.body.removeChild(overlay); };
+  document.body.appendChild(overlay);
+}
+
+// ================== ИГРА «КИРКА» (баг уровней исправлен) ==================
+const rockEl   = document.getElementById('rock');
+const pickEl   = document.getElementById('pick');
+const crack1   = document.getElementById('crack1');
+const crack2   = document.getElementById('crack2');
+const hpFill   = document.getElementById('mine-hpfill');
+const mineWrap = document.getElementById('mine-wrap');
+const lvlEl    = document.getElementById('mine-level');
+const rwdEl    = document.getElementById('mine-reward');
+
+let mineLevel = 1;
+let pickLevel = 1;
+let mineMaxHp, mineHp, mineReward;
+let mineBreaking = false;
+
+function mineSetup(){
+  mineMaxHp  = 10 + mineLevel * 6;
+  mineHp     = mineMaxHp;
+  mineReward = mineMaxHp * 15;
+  lvlEl.textContent = mineLevel;
+  rwdEl.textContent = fmt(mineReward);
+  updatePickaxeUI();
+  hpFill.style.width = '100%';
+  crack1.classList.remove('show');
+  crack2.classList.remove('show');
+  rockEl.classList.remove('breaking');
+  rockEl.style.display = 'flex';
+  rockEl.textContent = '🪨';
+  mineBreaking = false;
+}
+
+function mineHit(e){
+  if(animRunning || caseOpening) return;
+  if(mineBreaking) return;
+  mineHp = Math.max(0, mineHp - pickLevel);
+  haptic('medium');
+
+  pickEl.classList.remove('swing');
+  void pickEl.offsetWidth;
+  pickEl.classList.add('swing');
+
+  rockEl.classList.remove('shake');
+  void rockEl.offsetWidth;
+  rockEl.classList.add('shake');
+
+  const dmg = document.createElement('div');
+  dmg.className = 'dmg';
+  dmg.textContent = '-' + pickLevel;
+  const rect = mineWrap.getBoundingClientRect();
+  const x = (e.clientX ? e.clientX - rect.left : rect.width/2) + (Math.random()*30-15);
+  const y = (e.clientY ? e.clientY - rect.top : rect.height/2) - 10;
+  dmg.style.left = x + 'px';
+  dmg.style.top  = y + 'px';
+  mineWrap.appendChild(dmg);
+  setTimeout(()=>dmg.remove(), 800);
+
+  const pct = Math.max(0, mineHp / mineMaxHp * 100);
+  hpFill.style.width = pct + '%';
+  if(pct < 66) crack1.classList.add('show');
+  if(pct < 33) crack2.classList.add('show');
+
+  if(mineHp <= 0) mineBreak();
+}
+
+function mineBreak(){
+  mineBreaking = true;
+  rockEl.classList.remove('shake');
+  rockEl.classList.add('breaking');
+  haptic('heavy');
+  hapticNote('success');
+
+  setTimeout(()=>{
+    balance += mineReward;
+    updateBalance();
+
+    let giftMsg = '';
+    if(Math.random() < 0.12){
+      const pool = Math.random() < 0.7
+        ? GIFTS.filter(g=>g.rarity==='common' || g.rarity==='rare')
+        : GIFTS.filter(g=>g.rarity==='rare' || g.rarity==='epic' || g.rarity==='legend');
+      const g = pool[Math.floor(Math.random()*pool.length)];
+      addToInventory(g.id, true);
+      renderInventory();
+      giftMsg = ` + подарок ${g.emoji} ${g.name}!`;
+      hapticNote('success');
+    }
+
+    const pop = document.createElement('div');
+    pop.className = 'mine-reward-pop';
+    pop.textContent = '+' + fmt(mineReward) + ' ⭐' + (giftMsg ? '\n🎁' : '');
+    mineWrap.appendChild(pop);
+    setTimeout(()=>pop.remove(), 1200);
+
+    log(`⛏️ Камень <b>${mineLevel}</b> уровня разбит: <b>+${fmt(mineReward)} ⭐</b>${giftMsg}`, 'win');
+    toast(`⛏️ +${fmt(mineReward)} звёзд!`);
+
+    mineLevel++;
+    saveGame();
+    setTimeout(mineSetup, 900);
+  }, 500);
+}
+
+const PICKAXE_MAX_LEVEL = 10;
+function pickUpgradeCost(){ return Math.round(250 * Math.pow(pickLevel, 1.65)); }
+function updatePickaxeUI(){
+  const levelEl=document.getElementById('pick-level');
+  const damageEl=document.getElementById('pick-damage');
+  const btn=document.getElementById('pick-upgrade-btn');
+  if(!levelEl||!damageEl||!btn) return;
+  levelEl.textContent=pickLevel;
+  damageEl.textContent=pickLevel;
+  if(pickLevel >= PICKAXE_MAX_LEVEL){
+    btn.textContent='🏆 Максимальный уровень достигнут';
+    btn.disabled=true;
+    return;
+  }
+  const cost=pickUpgradeCost();
+  btn.textContent=`⬆️ Улучшить за ${fmt(cost)} ⭐`;
+  btn.disabled=balance<cost;
+}
+function upgradePickaxe(){
+  if(pickLevel >= PICKAXE_MAX_LEVEL){toast('Кирка уже максимального 10 уровня!');updatePickaxeUI();return;}
+  const cost=pickUpgradeCost();
+  if(balance<cost){toast('Не хватает звёзд!');return;}
+  balance-=cost;
+  pickLevel++;
+  updateBalance();
+  updatePickaxeUI();
+  saveGame();
+  toast(`⛏️ Кирка улучшена до ${pickLevel} уровня!`);
+  log(`⛏️ Кирка улучшена до <b>${pickLevel}</b> уровня: урон ${pickLevel}, потрачено ${fmt(cost)} ⭐`, 'win');
+}
+
+mineWrap.addEventListener('pointerdown', mineHit);
+mineSetup();
+
+// ================== КРУГЛАЯ РУЛЕТКА ==================
+const TAU = Math.PI * 2;
+
+function runUpgradeAnimation(fromGift, toGift, chance, isWin, onDone){
+  animRunning = true;
+  animOverlay.classList.add('show');
+  animResult.className = '';
+  animResult.textContent = '';
+  animTitle.innerHTML = `<span class="from">${fromGift.emoji} ${fromGift.name}</span> ➜ <span class="to">${toGift.emoji} ${toGift.name}</span>`;
+  animChance.textContent = `Шанс на успех: ${chance}%`;
+
+  const W = animCanvas.width, H = animCanvas.height;
+  const cx = W/2, cy = H/2;
+  const R = W/2 - 14;
+  const winAngle = TAU * chance / 100;
+  const winStart = Math.random() * TAU;
+
+  let targetPointer;
+  if(isWin){
+    targetPointer = winStart + winAngle * (0.15 + Math.random()*0.7);
+  } else {
+    const loseStart = winStart + winAngle;
+    const loseAngle = TAU - winAngle;
+    targetPointer = loseStart + loseAngle * (0.08 + Math.random()*0.84);
+  }
+  targetPointer = ((targetPointer % TAU) + TAU) % TAU;
+
+  // Вращаем указатель над неподвижным колесом.
+  const TURNS = 5 + Math.floor(Math.random()*2);
+  const FINAL = targetPointer + Math.PI/2 + TURNS * TAU;
+
+  const DURATION = 4200;
+  const start = performance.now();
+  let lastTick = 0;
+
+  function easeOutQuart(t){ return 1 - Math.pow(1 - t, 4); }
+
+  function drawWheel(rot){
+    actx.clearRect(0,0,W,H);
+    actx.save();
+    actx.translate(cx, cy);
+    actx.rotate(rot);
+
+    actx.beginPath(); actx.arc(0,0,R,0,TAU);
+    actx.fillStyle = 'rgba(60,20,28,.95)'; actx.fill();
+
+    actx.save();
+    actx.shadowColor = 'rgba(252,129,129,.5)';
+    actx.shadowBlur = 16;
+    actx.beginPath();
+    actx.moveTo(0,0);
+    actx.arc(0,0,R, winStart+winAngle, winStart);
+    actx.closePath();
+    actx.fillStyle = 'rgba(180,50,60,.75)'; actx.fill();
+    actx.restore();
+
+    actx.save();
+    actx.shadowColor = 'rgba(104,211,145,.85)';
+    actx.shadowBlur = 22;
+    actx.beginPath();
+    actx.moveTo(0,0);
+    actx.arc(0,0,R, winStart, winStart+winAngle);
+    actx.closePath();
+    actx.fillStyle = 'rgba(80,200,130,.92)'; actx.fill();
+    actx.restore();
+
+    actx.strokeStyle = 'rgba(255,255,255,.85)';
+    actx.lineWidth = 2.5;
+    [winStart, winStart+winAngle].forEach(a=>{
+      actx.beginPath();
+      actx.moveTo(Math.cos(a)*(R-6), Math.sin(a)*(R-6));
+      actx.lineTo(Math.cos(a)*R, Math.sin(a)*R);
+      actx.stroke();
+    });
+
+    actx.strokeStyle = 'rgba(255,255,255,.15)';
+    actx.lineWidth = 1.5;
+    for(let i=0;i<36;i++){
+      const a = i/36*TAU;
+      actx.beginPath();
+      actx.moveTo(Math.cos(a)*(R-10), Math.sin(a)*(R-10));
+      actx.lineTo(Math.cos(a)*(R-4), Math.sin(a)*(R-4));
+      actx.stroke();
+    }
+
+    if(winAngle > 0.35){
+      const midA = winStart + winAngle/2;
+      const lr = R*0.66;
+      actx.save();
+      actx.rotate(midA + Math.PI/2);
+      actx.translate(0, -lr);
+      actx.rotate(-(midA + Math.PI/2) - rot);
+      actx.fillStyle = '#08301c';
+      actx.font = 'bold 20px Segoe UI';
+      actx.textAlign = 'center';
+      actx.fillText(chance + '%', 0, 7);
+      actx.restore();
+    }
+
+    actx.restore();
+
+    actx.beginPath(); actx.arc(cx,cy,R+5,0,TAU);
+    actx.strokeStyle = 'rgba(255,255,255,.22)'; actx.lineWidth = 2; actx.stroke();
+
+    actx.beginPath(); actx.arc(cx,cy,R*0.34,0,TAU);
+    actx.fillStyle = '#14122b'; actx.fill();
+    actx.strokeStyle = 'rgba(255,255,255,.25)'; actx.lineWidth = 2; actx.stroke();
+    actx.font = (R*0.34) + 'px Segoe UI';
+    actx.textAlign = 'center'; actx.textBaseline = 'middle';
+    actx.fillText(toGift.emoji, cx, cy+4);
+
+
+  }
+
+  function frame(now){
+    const t = Math.min((now - start)/DURATION, 1);
+    const rot = easeOutQuart(t) * FINAL;
+    drawWheel(0);
+    document.getElementById('wheel-pointer').style.transform = `rotate(${rot}rad)`;
+    if(t < 0.88 && now - lastTick > 60){ lastTick = now; haptic('light'); }
+    if(t < 1){ requestAnimationFrame(frame); }
+    else { finishAnimation(isWin, onDone); }
+  }
+
+  function finishAnimation(isWin, onDone){
+    actx.save();
+    actx.globalAlpha = .35;
+    actx.beginPath(); actx.arc(cx,cy,R+6,0,TAU);
+    actx.fillStyle = isWin ? '#68d391' : '#fc8181';
+    actx.fill();
+    actx.restore();
+
+    hapticNote(isWin ? 'success' : 'error');
+
+    animResult.textContent = isWin ? '🎉 ПОБЕДА!' : '💥 ПРОВАЛ';
+    animResult.className = 'show ' + (isWin ? 'win' : 'lose');
+
+    setTimeout(()=>{
+      animOverlay.classList.remove('show');
+      animRunning = false;
+      onDone();
+    }, 1500);
+  }
+
+  requestAnimationFrame(frame);
+}
+
+// ---------- Апгрейд ----------
+upgradeBtn.onclick = ()=>{
+  if(!selectedUids.length || !targetId || animRunning || caseOpening) return;
+  const items = selectedUids.map(invItem).filter(Boolean);
+  if(!items.length) return;
+  const totalValue = items.reduce((sum,item)=>sum+giftById(item.giftId).price,0);
+  const fromNames = items.map(item=>`${giftById(item.giftId).emoji} ${giftById(item.giftId).name}`);
+  const to = giftById(targetId);
+  if(to.price <= totalValue) return;
+
+  const chance = Math.min(90, Math.round(totalValue / to.price * 100));
+  const isWin = Math.random()*100 < chance;
+  const representativeFrom = {name: `${items.length} подарков`, emoji: items.map(item=>giftById(item.giftId).emoji).slice(0,4).join(' '), price: totalValue};
+
+  upgradeBtn.disabled = true;
+  upgradeBtn.textContent = '🎲 Крутим...';
+  haptic('heavy');
+
+  runUpgradeAnimation(representativeFrom, to, chance, isWin, ()=>{
+    const consumedUids = items.map(item=>item.uid);
+    inventory = inventory.filter(item=>!consumedUids.includes(item.uid));
+    if(isWin) addToInventory(targetId, true);
+    selectedUids = [];
+    saveGame();
+    renderInventory();
+    if(isWin){
+      log(`✅ <b>${fromNames.join(', ')}</b> → <b>${to.emoji} ${to.name}</b> — успех! (шанс ${chance}%, сумма ${fmt(totalValue)} ⭐)`, 'win');
+      toast(`🎉 Успех! Получен ${to.emoji} ${to.name}`, 'win');
+    } else {
+      log(`❌ <b>${fromNames.join(', ')}</b> → <b>${to.emoji} ${to.name}</b> — провал, все выбранные подарки сгорели. (шанс ${chance}%)`, 'lose');
+      toast('💥 Провал! Выбранные подарки сгорели', 'lose');
+    }
+    targetId = null;
+    updateUpgradeView();
+    upgradeBtn.textContent = '🚀 Апгрейд';
+  });
+};
+
+// ---------- Сброс ----------
+clearBtn.onclick = ()=>{
+  if(animRunning || caseOpening) return;
+  haptic('light');
+  selectedUids = [];
+  targetId = null;
+  renderInventory();
+  updateUpgradeView();
+};
+
+// ---------- Инициализация ----------
+function init(){
+  renderInventory();
+  renderCases();
+  renderShopFilters();
+  renderShop();
+  updateUpgradeView();
+  updateBalance();
+
+  log('Добро пожаловать! Открой кейс 📦 или выбери подарок для апгрейда.');
+}
+
+
+// ---------- Античит: лимит кликов ----------
+// Более 15 реальных кликов в скользящем окне 1 секунды удаляют текущий
+// локальный игровой аккаунт. Это клиентская защита и не заменяет серверный античит.
+const antiCheatClickTimes = [];
+let antiCheatTriggered = false;
+document.addEventListener('click', (event) => {
+  if (antiCheatTriggered || !event.isTrusted || !currentUser) return;
+  const now = Date.now();
+  antiCheatClickTimes.push(now);
+  while (antiCheatClickTimes.length && now - antiCheatClickTimes[0] > 1000) {
+    antiCheatClickTimes.shift();
+  }
+  if (antiCheatClickTimes.length > 15) {
+    antiCheatTriggered = true;
+    const bannedName = currentUser;
+    try {
+      const accounts = JSON.parse(localStorage.getItem('giftUpgraderAccounts_v1') || '{}');
+      delete accounts[bannedName];
+      localStorage.setItem('giftUpgraderAccounts_v1', JSON.stringify(accounts));
+    } catch (e) {}
+    currentUser = null;
+    alert('Античит: обнаружено больше 15 кликов за секунду. Твой локальный игровой аккаунт удалён.');
+    location.reload();
+  }
+}, true);
+
+// ---------- Аккаунты и сохранение ----------
+const ACCOUNTS_KEY = 'giftUpgraderAccounts_v1';
+// One-time full account wipe for this release: all old local accounts are removed
+// on the first load of this version, then users can register new accounts.
+// The new marker prevents clearing newly created accounts on every refresh.
+const RESET_MARKER = 'giftUpgraderAccountsReset_v3_done';
+try {
+  if (localStorage.getItem(RESET_MARKER) !== 'yes') {
+    localStorage.removeItem(ACCOUNTS_KEY);
+    localStorage.setItem(RESET_MARKER, 'yes');
+  }
+} catch (e) { /* storage may be disabled */ }
+function getAccounts(){ try{return JSON.parse(localStorage.getItem(ACCOUNTS_KEY)||'{}')}catch(e){return {}} }
+function saveGame(){
+  if(!currentUser) return;
+  try{
+    const accounts=getAccounts();
+    if(!accounts[currentUser]) return;
+    accounts[currentUser].game={balance,inventory,uidCounter,mineLevel,pickLevel};
+    localStorage.setItem(ACCOUNTS_KEY,JSON.stringify(accounts));
+  }catch(e){ /* storage may be disabled */ }
+}
+function loadGame(username){
+  currentUser=username;
+  const data=getAccounts()[username]?.game;
+  balance=Number.isFinite(data?.balance)?data.balance:1000;
+  inventory=Array.isArray(data?.inventory)?data.inventory.filter(x=>giftById(x.giftId)):[];
+  uidCounter=Number.isFinite(data?.uidCounter)?data.uidCounter:1;
+  mineLevel=Number.isFinite(data?.mineLevel)?Math.max(1,data.mineLevel):1;
+  pickLevel=Number.isFinite(data?.pickLevel)?Math.min(10,Math.max(1,data.pickLevel)):1;
+  selectedUids=[];targetId=null;
+  mineSetup();
+  document.getElementById('account-label').textContent='👤 '+username;
+  document.getElementById('account-screen').style.display='none';
+  init();
+  if(!data){['common1','common2','common3','common4'].forEach(id=>addToInventory(id,true));renderInventory();saveGame();}
+}
+function showAuth(){document.getElementById('account-screen').style.display='flex';document.getElementById('account-status').textContent='';}
+document.getElementById('login-tab').onclick=()=>{authMode='login';document.getElementById('login-tab').classList.add('active');document.getElementById('register-tab').classList.remove('active');document.getElementById('account-submit').textContent='Войти';document.getElementById('account-password').autocomplete='current-password';document.getElementById('account-status').textContent='';};
+document.getElementById('register-tab').onclick=()=>{authMode='register';document.getElementById('register-tab').classList.add('active');document.getElementById('login-tab').classList.remove('active');document.getElementById('account-submit').textContent='Создать аккаунт';document.getElementById('account-password').autocomplete='new-password';document.getElementById('account-status').textContent='';};
+document.getElementById('account-form').addEventListener('submit',e=>{
+  e.preventDefault();
+  const username=document.getElementById('account-name').value.trim();
+  const password=document.getElementById('account-password').value;
+  const status=document.getElementById('account-status');
+  if(!/^[\p{L}\p{N}_-]{3,24}$/u.test(username)){status.textContent='Логин: 3–24 буквы, цифры, _ или -.';return;}
+  const accounts=getAccounts();
+  if(authMode==='register'){
+    if(accounts[username]){status.textContent='Такой логин уже занят на этом устройстве.';return;}
+    accounts[username]={password,game:null};localStorage.setItem(ACCOUNTS_KEY,JSON.stringify(accounts));
+  }else{
+    if(!accounts[username]||accounts[username].password!==password){status.textContent='Неверный логин или пароль.';return;}
+  }
+  loadGame(username);
+});
+document.getElementById('switch-account').onclick=()=>{if(!animRunning&&!caseOpening){saveGame();showAuth();}};
+// Do not start a guest game: authenticate first.
+showAuth();
+</script>
+</body>
+</html>
